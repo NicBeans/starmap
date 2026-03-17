@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
@@ -30,6 +30,76 @@ interface SkyView3DProps {
 
 const STAR_SPHERE_RADIUS = 100;
 const STAR_CLICK_THRESHOLD_DEG = 2; // angular tolerance for star picking
+const MIN_FOV = 10;
+const MAX_FOV = 90;
+const ZOOM_SPEED = 0.15;
+
+/**
+ * FOV-based zoom handler — scroll/pinch changes field of view instead of camera distance.
+ * This is the correct approach for a sky sphere where the camera sits at the center.
+ */
+function FovZoomHandler() {
+  const { camera, gl } = useThree();
+  const targetFov = useRef((camera as THREE.PerspectiveCamera).fov);
+
+  useEffect(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    const el = gl.domElement;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 : -1;
+      targetFov.current = Math.max(MIN_FOV, Math.min(MAX_FOV, targetFov.current + delta * ZOOM_SPEED * targetFov.current));
+    };
+
+    // Pinch zoom via touch
+    let lastPinchDist = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (lastPinchDist > 0) {
+          const ratio = lastPinchDist / dist;
+          targetFov.current = Math.max(MIN_FOV, Math.min(MAX_FOV, cam.fov * ratio));
+        }
+        lastPinchDist = dist;
+      }
+    };
+    const onTouchEnd = () => { lastPinchDist = 0; };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [camera, gl]);
+
+  // Smooth interpolation each frame
+  useFrame(() => {
+    const cam = camera as THREE.PerspectiveCamera;
+    const diff = targetFov.current - cam.fov;
+    if (Math.abs(diff) > 0.01) {
+      cam.fov += diff * 0.2;
+      cam.updateProjectionMatrix();
+    }
+  });
+
+  return null;
+}
 
 /**
  * Inner component that handles star click raycasting via useThree
@@ -192,14 +262,13 @@ export default function SkyView3D({
         {preferences.showHorizon && <Horizon />}
       </Suspense>
 
+      <FovZoomHandler />
+
       <OrbitControls
         ref={controlsRef}
-        enableZoom={true}
+        enableZoom={false}
         enablePan={false}
         rotateSpeed={-0.5}
-        zoomSpeed={0.5}
-        minDistance={0.01}
-        maxDistance={0.5}
         target={[0, 0, 0]}
         enableDamping
         dampingFactor={0.1}

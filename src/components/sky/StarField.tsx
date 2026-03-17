@@ -26,7 +26,7 @@ function spectralColor(type: string): THREE.Color {
 
 function magnitudeToSize(mag: number, baseSize: number): number {
   const scaledMag = Math.max(-2, Math.min(mag, 10));
-  return baseSize * Math.pow(10, -scaledMag / 5) * 0.5;
+  return baseSize * Math.pow(10, -scaledMag / 5) * 1.5;
 }
 
 const SPHERE_RADIUS = 100;
