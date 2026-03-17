@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# skills (claude code)
+/skills
+
+# Generated star catalog data (run `node scripts/prepare-data.mjs` to generate)
+public/data/stars.json
+
+# PWA generated
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map

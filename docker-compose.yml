@@ -1,0 +1,10 @@
+services:
+  starmap:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - CELESTRAK_URL=https://celestrak.org
+      - GEOCODE_URL=https://nominatim.openstreetmap.org
+    restart: unless-stopped
