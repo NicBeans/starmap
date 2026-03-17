@@ -10,6 +10,7 @@ import Planets from "./Planets";
 import Horizon from "./Horizon";
 import Constellations from "./Constellations";
 import GridOverlay from "./GridOverlay";
+import MilkyWay from "./MilkyWay";
 import Satellites3D from "./Satellites3D";
 import type { StarData, ConstellationLine } from "@/lib/catalog";
 import type { CelestialBody } from "@/lib/astronomy";
@@ -256,6 +257,8 @@ export default function SkyView3D({
           stars={stars}
           visible={preferences.showConstellationLines}
         />
+
+        <MilkyWay visible={preferences.showMilkyWay} />
 
         <GridOverlay visible={preferences.showGrid} />
 

@@ -67,6 +67,7 @@ export default function SettingsPanel({
 
           <div className="space-y-3">
             <Toggle label="Constellation Lines" checked={preferences.showConstellationLines} onChange={(v) => onUpdatePreference("showConstellationLines", v)} />
+            <Toggle label="Milky Way" checked={preferences.showMilkyWay} onChange={(v) => onUpdatePreference("showMilkyWay", v)} />
             <Toggle label="Labels" checked={preferences.showLabels} onChange={(v) => onUpdatePreference("showLabels", v)} />
             <Toggle label="Coordinate Grid" checked={preferences.showGrid} onChange={(v) => onUpdatePreference("showGrid", v)} />
             <Toggle label="Horizon" checked={preferences.showHorizon} onChange={(v) => onUpdatePreference("showHorizon", v)} />

@@ -7,6 +7,7 @@ export interface UserPreferences {
   quality: QualityLevel;
   viewMode: ViewMode;
   showConstellationLines: boolean;
+  showMilkyWay: boolean;
   showLabels: boolean;
   showGrid: boolean;
   showHorizon: boolean;
@@ -36,6 +37,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   quality: "auto",
   viewMode: "3d",
   showConstellationLines: true,
+  showMilkyWay: true,
   showLabels: true,
   showGrid: false,
   showHorizon: true,
