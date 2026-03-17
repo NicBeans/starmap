@@ -10,14 +10,17 @@ interface ConstellationsProps {
   constellationLines: ConstellationLine[];
   stars: StarData[];
   visible: boolean;
+  onConstellationClick?: (constellation: ConstellationLine) => void;
 }
 
-const SPHERE_RADIUS = 99; // between stars and horizon
+const SPHERE_RADIUS = 99;
+const HIT_TUBE_RADIUS = 2; // invisible click target width
 
 export default function Constellations({
   constellationLines,
   stars,
   visible,
+  onConstellationClick,
 }: ConstellationsProps) {
   const hipIndex = useMemo(() => {
     const map = new Map<number, StarData>();
@@ -27,12 +30,12 @@ export default function Constellations({
     return map;
   }, [stars]);
 
-  const lineSegments = useMemo(() => {
+  const constellationData = useMemo(() => {
     if (!visible) return [];
 
-    const seen = new Set<string>();
-    return constellationLines.flatMap((c) => {
-      return c.segments
+    return constellationLines.map((c) => {
+      const seen = new Set<string>();
+      const segments = c.segments
         .map(([hip1, hip2]) => {
           const s1 = hipIndex.get(hip1);
           const s2 = hipIndex.get(hip2);
@@ -44,24 +47,18 @@ export default function Constellations({
           }
           seen.add(key);
 
-          const p1 = raDecToCartesian(
-            { ra: s1.ra, dec: s1.dec },
-            SPHERE_RADIUS
-          );
-          const p2 = raDecToCartesian(
-            { ra: s2.ra, dec: s2.dec },
-            SPHERE_RADIUS
-          );
+          const p1 = raDecToCartesian({ ra: s1.ra, dec: s1.dec }, SPHERE_RADIUS);
+          const p2 = raDecToCartesian({ ra: s2.ra, dec: s2.dec }, SPHERE_RADIUS);
 
           return {
             key,
-            points: [
-              new THREE.Vector3(p1.x, p1.y, p1.z),
-              new THREE.Vector3(p2.x, p2.y, p2.z),
-            ],
+            start: new THREE.Vector3(p1.x, p1.y, p1.z),
+            end: new THREE.Vector3(p2.x, p2.y, p2.z),
           };
         })
-        .filter(Boolean) as { key: string; points: THREE.Vector3[] }[];
+        .filter(Boolean) as { key: string; start: THREE.Vector3; end: THREE.Vector3 }[];
+
+      return { constellation: c, segments };
     });
   }, [constellationLines, hipIndex, visible]);
 
@@ -69,16 +66,71 @@ export default function Constellations({
 
   return (
     <group>
-      {lineSegments.map(({ key, points }) => (
-        <Line
-          key={key}
-          points={points}
-          color="#223355"
-          lineWidth={0.5}
-          transparent
-          opacity={0.4}
-        />
+      {constellationData.map(({ constellation, segments }) => (
+        <group key={constellation.constellation}>
+          {segments.map(({ key, start, end }) => (
+            <group key={key}>
+              {/* Visible line */}
+              <Line
+                points={[start, end]}
+                color="#4488cc"
+                lineWidth={1.5}
+                transparent
+                opacity={0.6}
+              />
+              {/* Invisible clickable tube */}
+              <ClickableTube
+                start={start}
+                end={end}
+                onClick={() => onConstellationClick?.(constellation)}
+              />
+            </group>
+          ))}
+        </group>
       ))}
     </group>
+  );
+}
+
+/**
+ * An invisible tube mesh between two points that acts as a click target.
+ */
+function ClickableTube({
+  start,
+  end,
+  onClick,
+}: {
+  start: THREE.Vector3;
+  end: THREE.Vector3;
+  onClick: () => void;
+}) {
+  const { position, quaternion, length } = useMemo(() => {
+    const mid = start.clone().add(end).multiplyScalar(0.5);
+    const dir = end.clone().sub(start);
+    const len = dir.length();
+    const quat = new THREE.Quaternion();
+    quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    return { position: mid, quaternion: quat, length: len };
+  }, [start, end]);
+
+  return (
+    <mesh
+      position={position}
+      quaternion={quaternion}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+      }}
+    >
+      <cylinderGeometry args={[HIT_TUBE_RADIUS, HIT_TUBE_RADIUS, length, 6]} />
+      <meshBasicMaterial visible={false} />
+    </mesh>
   );
 }

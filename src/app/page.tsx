@@ -16,6 +16,7 @@ import TimeScrubber from "@/components/ui/TimeScrubber";
 import LocationPicker from "@/components/ui/LocationPicker";
 import SettingsPanel from "@/components/ui/SettingsPanel";
 import type { StarData, DSOData } from "@/lib/catalog";
+import { CONSTELLATION_DESCRIPTIONS } from "@/lib/constellations";
 
 // Dynamic import for 3D view (needs client-only WebGL)
 const SkyView3D = dynamic(() => import("@/components/sky/SkyView3D"), {
@@ -125,6 +126,18 @@ export default function Home() {
   const handleObjectClick = useCallback(
     (obj: { id: string; name: string; type: string }) => {
       const details: Record<string, string> = {};
+
+      // Find constellation details
+      if (obj.type === "constellation" && obj.id.startsWith("const_")) {
+        const abbr = obj.id.replace("const_", "");
+        const info = CONSTELLATION_DESCRIPTIONS[abbr];
+        if (info) {
+          details["Description"] = info.description;
+          details["Mythology"] = info.mythology;
+          details["Brightest Star"] = info.brightestStar;
+          if (info.zodiac) details["Zodiac"] = "Yes";
+        }
+      }
 
       // Find star details
       if (obj.type === "star" && obj.id.startsWith("star_")) {

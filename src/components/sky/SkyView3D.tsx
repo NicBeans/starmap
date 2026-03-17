@@ -103,75 +103,40 @@ function FovZoomHandler() {
 }
 
 /**
- * Inner component that handles star click raycasting via useThree
+ * Finds the nearest star to a screen-space click using angular distance.
+ * Called only when no R3F mesh (planet, satellite, constellation) was hit.
  */
-function StarClickHandler({
-  stars,
-  maxMagnitude,
-  onStarClick,
-}: {
-  stars: StarData[];
-  maxMagnitude: number;
-  onStarClick: (star: StarData) => void;
-}) {
-  const { camera, gl } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-
-  const filteredStars = useMemo(
-    () => stars.filter((s) => s.mag <= maxMagnitude),
-    [stars, maxMagnitude]
+function findNearestStar(
+  event: MouseEvent,
+  camera: THREE.Camera,
+  canvas: HTMLCanvasElement,
+  starPositions: THREE.Vector3[],
+  filteredStars: StarData[],
+): StarData | null {
+  const rect = canvas.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
   );
 
-  const starPositions = useMemo(() => {
-    return filteredStars.map((star) => {
-      const pos = raDecToCartesian({ ra: star.ra, dec: star.dec }, STAR_SPHERE_RADIUS);
-      return new THREE.Vector3(pos.x, pos.y, pos.z);
-    });
-  }, [filteredStars]);
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const rayDir = raycaster.ray.direction.clone().normalize();
 
-  const handlePointerDown = useCallback(
-    (e: PointerEvent) => {
-      // Only handle primary button clicks
-      if (e.button !== 0) return;
+  const thresholdRad = (STAR_CLICK_THRESHOLD_DEG * Math.PI) / 180;
+  let bestIdx = -1;
+  let bestAngle = thresholdRad;
 
-      const rect = gl.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1
-      );
+  for (let i = 0; i < starPositions.length; i++) {
+    const starDir = starPositions[i].clone().normalize();
+    const angle = Math.acos(Math.min(1, rayDir.dot(starDir)));
+    if (angle < bestAngle) {
+      bestAngle = angle;
+      bestIdx = i;
+    }
+  }
 
-      raycaster.setFromCamera(mouse, camera);
-      const rayDir = raycaster.ray.direction.clone().normalize();
-
-      // Find the closest star to the ray (angular distance)
-      const thresholdRad = (STAR_CLICK_THRESHOLD_DEG * Math.PI) / 180;
-      let bestIdx = -1;
-      let bestAngle = thresholdRad;
-
-      for (let i = 0; i < starPositions.length; i++) {
-        const starDir = starPositions[i].clone().normalize();
-        const angle = Math.acos(Math.min(1, rayDir.dot(starDir)));
-        if (angle < bestAngle) {
-          bestAngle = angle;
-          bestIdx = i;
-        }
-      }
-
-      if (bestIdx >= 0) {
-        onStarClick(filteredStars[bestIdx]);
-      }
-    },
-    [camera, gl, raycaster, starPositions, filteredStars, onStarClick]
-  );
-
-  // Attach pointer listener to canvas
-  useEffect(() => {
-    const el = gl.domElement;
-    el.addEventListener("pointerdown", handlePointerDown);
-    return () => el.removeEventListener("pointerdown", handlePointerDown);
-  }, [gl, handlePointerDown]);
-
-  return null;
+  return bestIdx >= 0 ? filteredStars[bestIdx] : null;
 }
 
 export default function SkyView3D({
@@ -184,14 +149,6 @@ export default function SkyView3D({
   onObjectClick,
 }: SkyView3DProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-
-  const handleCreated = useCallback(
-    ({ camera }: { camera: THREE.Camera }) => {
-      camera.position.set(0, 0, 0.1);
-      camera.lookAt(0, 5, -50);
-    },
-    []
-  );
 
   const handleBodyClick = useCallback(
     (body: CelestialBody) => {
@@ -207,12 +164,53 @@ export default function SkyView3D({
     [onObjectClick]
   );
 
-  const handleStarClick = useCallback(
-    (star: StarData) => {
+  const filteredStars = useMemo(
+    () => stars.filter((s) => s.mag <= lodConfig.maxStarMagnitude),
+    [stars, lodConfig.maxStarMagnitude]
+  );
+
+  const starPositions = useMemo(() => {
+    return filteredStars.map((star) => {
+      const pos = raDecToCartesian({ ra: star.ra, dec: star.dec }, STAR_SPHERE_RADIUS);
+      return new THREE.Vector3(pos.x, pos.y, pos.z);
+    });
+  }, [filteredStars]);
+
+  const cameraRef = useRef<THREE.Camera | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const handleCreatedFull = useCallback(
+    ({ camera, gl: renderer }: { camera: THREE.Camera; gl: THREE.WebGLRenderer }) => {
+      camera.position.set(0, 0, 0.1);
+      camera.lookAt(0, 5, -50);
+      cameraRef.current = camera;
+      canvasRef.current = renderer.domElement;
+    },
+    []
+  );
+
+  // onPointerMissed fires when no R3F mesh was hit — fallback to star angular matching
+  const handlePointerMissed = useCallback(
+    (event: MouseEvent) => {
+      if (!cameraRef.current || !canvasRef.current) return;
+      const star = findNearestStar(event, cameraRef.current, canvasRef.current, starPositions, filteredStars);
+      if (star) {
+        onObjectClick?.({
+          id: `star_${star.id}`,
+          name: star.name || star.bayer || `HIP ${star.hip}` || `Star ${star.id}`,
+          type: "star",
+        });
+      }
+    },
+    [starPositions, filteredStars, onObjectClick]
+  );
+
+  const handleConstellationClick = useCallback(
+    (c: ConstellationLine) => {
       onObjectClick?.({
-        id: `star_${star.id}`,
-        name: star.name || star.bayer || `HIP ${star.hip}` || `Star ${star.id}`,
-        type: "star",
+        id: `const_${c.constellation}`,
+        name: c.name,
+        type: "constellation",
       });
     },
     [onObjectClick]
@@ -221,19 +219,14 @@ export default function SkyView3D({
   return (
     <Canvas
       camera={{ fov: 60, near: 0.1, far: 500 }}
-      onCreated={handleCreated}
+      onCreated={handleCreatedFull}
+      onPointerMissed={handlePointerMissed}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, alpha: false }}
     >
       <color attach="background" args={["#0a0a1a"]} />
 
       <Suspense fallback={null}>
-        <StarClickHandler
-          stars={stars}
-          maxMagnitude={lodConfig.maxStarMagnitude}
-          onStarClick={handleStarClick}
-        />
-
         <StarField
           stars={stars}
           maxMagnitude={lodConfig.maxStarMagnitude}
@@ -256,6 +249,7 @@ export default function SkyView3D({
           constellationLines={constellationLines}
           stars={stars}
           visible={preferences.showConstellationLines}
+          onConstellationClick={handleConstellationClick}
         />
 
         <MilkyWay visible={preferences.showMilkyWay} />
