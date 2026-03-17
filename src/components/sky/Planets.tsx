@@ -9,6 +9,7 @@ import { altAzToCartesian } from "@/lib/coordinates";
 interface PlanetsProps {
   bodies: CelestialBody[];
   showLabels: boolean;
+  onBodyClick?: (body: CelestialBody) => void;
 }
 
 const BODY_COLORS: Record<string, string> = {
@@ -18,10 +19,9 @@ const BODY_COLORS: Record<string, string> = {
 
 const SPHERE_RADIUS = 95;
 
-export default function Planets({ bodies, showLabels }: PlanetsProps) {
+export default function Planets({ bodies, showLabels, onBodyClick }: PlanetsProps) {
   const visibleBodies = useMemo(() => bodies.filter((b) => b.altitude > -5), [bodies]);
 
-  // Shared geometry — created once, disposed on unmount
   const sharedGeoLarge = useRef(new THREE.CircleGeometry(3, 32));
   const sharedGeoSmall = useRef(new THREE.CircleGeometry(1.5, 32));
 
@@ -42,7 +42,20 @@ export default function Planets({ bodies, showLabels }: PlanetsProps) {
         return (
           <group key={body.id} position={[pos.x, pos.y, pos.z]}>
             <Billboard>
-              <mesh geometry={isLarge ? sharedGeoLarge.current : sharedGeoSmall.current}>
+              <mesh
+                geometry={isLarge ? sharedGeoLarge.current : sharedGeoSmall.current}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBodyClick?.(body);
+                }}
+                onPointerOver={(e) => {
+                  e.stopPropagation();
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "default";
+                }}
+              >
                 <meshBasicMaterial color={color} transparent opacity={0.9} />
               </mesh>
             </Billboard>

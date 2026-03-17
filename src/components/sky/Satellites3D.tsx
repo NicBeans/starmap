@@ -9,14 +9,14 @@ import { altAzToCartesian } from "@/lib/coordinates";
 interface Satellites3DProps {
   satellites: SatellitePosition[];
   showLabels: boolean;
+  onSatelliteClick?: (sat: SatellitePosition) => void;
 }
 
 const SPHERE_RADIUS = 90;
 
-export default function Satellites3D({ satellites, showLabels }: Satellites3DProps) {
+export default function Satellites3D({ satellites, showLabels, onSatelliteClick }: Satellites3DProps) {
   const visibleSats = useMemo(() => satellites.filter((s) => s.altitude > 0), [satellites]);
 
-  // Shared geometry — created once, disposed on unmount
   const sharedGeo = useRef(new THREE.CircleGeometry(0.6, 16));
 
   useEffect(() => {
@@ -32,7 +32,20 @@ export default function Satellites3D({ satellites, showLabels }: Satellites3DPro
         return (
           <group key={sat.id} position={[pos.x, pos.y, pos.z]}>
             <Billboard>
-              <mesh geometry={sharedGeo.current}>
+              <mesh
+                geometry={sharedGeo.current}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSatelliteClick?.(sat);
+                }}
+                onPointerOver={(e) => {
+                  e.stopPropagation();
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "default";
+                }}
+              >
                 <meshBasicMaterial color="#44ff88" transparent opacity={0.8} />
               </mesh>
             </Billboard>

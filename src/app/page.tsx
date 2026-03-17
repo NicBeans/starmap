@@ -126,7 +126,21 @@ export default function Home() {
     (obj: { id: string; name: string; type: string }) => {
       const details: Record<string, string> = {};
 
-      // Find details based on type
+      // Find star details
+      if (obj.type === "star" && obj.id.startsWith("star_")) {
+        const starId = parseInt(obj.id.replace("star_", ""), 10);
+        const star = stars.find((s) => s.id === starId);
+        if (star) {
+          details["Magnitude"] = star.mag.toFixed(2);
+          if (star.constellation) details["Constellation"] = star.constellation;
+          if (star.spectralType) details["Spectral Type"] = star.spectralType;
+          if (star.distance && star.distance > 0)
+            details["Distance"] = `${star.distance.toFixed(1)} pc`;
+          if (star.bayer) details["Designation"] = star.bayer;
+        }
+      }
+
+      // Find celestial body details
       const body = celestialBodies.find((b) => b.id === obj.id);
       if (body) {
         details["Altitude"] = `${body.altitude.toFixed(1)}°`;
@@ -148,7 +162,7 @@ export default function Home() {
 
       setSelectedObject({ ...obj, details });
     },
-    [celestialBodies, satellites]
+    [celestialBodies, satellites, stars]
   );
 
   const handleSelectSearchResult = useCallback(

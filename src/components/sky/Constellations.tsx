@@ -30,12 +30,19 @@ export default function Constellations({
   const lineSegments = useMemo(() => {
     if (!visible) return [];
 
+    const seen = new Set<string>();
     return constellationLines.flatMap((c) => {
       return c.segments
         .map(([hip1, hip2]) => {
           const s1 = hipIndex.get(hip1);
           const s2 = hipIndex.get(hip2);
           if (!s1 || !s2) return null;
+
+          let key = `${c.constellation}_${hip1}_${hip2}`;
+          if (seen.has(key)) {
+            key = `${key}_${seen.size}`;
+          }
+          seen.add(key);
 
           const p1 = raDecToCartesian(
             { ra: s1.ra, dec: s1.dec },
@@ -47,7 +54,7 @@ export default function Constellations({
           );
 
           return {
-            key: `${c.constellation}_${hip1}_${hip2}`,
+            key,
             points: [
               new THREE.Vector3(p1.x, p1.y, p1.z),
               new THREE.Vector3(p2.x, p2.y, p2.z),
