@@ -46,6 +46,9 @@ next-env.d.ts
 # Generated star catalog data (run `node scripts/prepare-data.mjs` to generate)
 public/data/stars.json
 
+# CI workflow (push manually — needs workflow scope)
+.github/workflows/ci.yml
+
 # PWA generated
 public/sw.js
 public/workbox-*.js
